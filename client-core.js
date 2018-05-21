@@ -3,9 +3,75 @@
 module.exports.execute = execute;
 module.exports.isStar = true;
 
-function execute() {
-    // Внутри этой функции нужно получить и обработать аргументы командной строки
-    const args = process.argv;
+const chalk = require('chalk');
+const red = chalk.hex('#f00');
+const green = chalk.hex('#0f0');
 
-    return Promise.resolve('Это строка будет выведена на консоль');
+const request = require('request');
+const defaultUrl = 'http://localhost:8080/messages/';
+const commands = {
+    list: get,
+    send: send
+};
+
+
+function findArgs() {
+    let parametrs = require('commander');
+    parametrs      
+        .option('--from [name]', 'from')
+        .option('--to [name]', 'to')
+        .option('--text [text]', 'text');
+    parametrs.from = undefined;
+    parametrs.to = undefined;
+    parametrs.text = '';
+
+    return parametrs.parse(process.argv);
+}
+
+function execute() {
+    let options = findArgs();
+
+    return commands[options.args[0]](options);
+}
+
+function get(options) {
+    let parametrs = { baseUrl: defaultUrl, url: '/', qs: { from: options.from, to: options.to },
+        method: 'GET', json: true };
+
+    return sendRequest(parametrs)
+        .then(messages => messages.map(message => colorisingOut(options, message)))
+        .then(message => message.join('\n\n'));
+}
+
+function send(options) {
+    let parametrs = { baseUrl: defaultUrl, url: '/', qs: { from: options.from, to: options.to },
+        method: 'POST', json: { text: options.text } };
+
+    return sendRequest(parametrs)
+        .then(message => colorisingOut(options, message));
+}
+
+
+function colorisingOut(options, message) {
+    let post = '';
+    if (message.from) {
+        post += (`${red('FROM')}: ${message.from}\n`);
+    }
+    if (message.to) {
+        post += (`${red('TO')}: ${message.to}\n`);
+    }
+    post += (`${green('TEXT')}: ${message.text}`);
+
+    return post;
+}
+
+function sendRequest(options) {
+    return new Promise((resolve, reject) => {
+        request(options, (err, response, body) => {
+            if (err) {
+                reject(err);
+            }
+            resolve(body);
+        });
+    });
 }
